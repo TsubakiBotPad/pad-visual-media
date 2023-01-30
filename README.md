@@ -14,6 +14,13 @@ yarn extract data/bin/mons_4428.bin data/spine  # extract spine data from binary
 yarn render data/spine/mons_4428.json data/vids  # render spine data into mp4 and gif formats
 ```
 
+File locations
+---------
+
+* /media/animated_portraits/{}.gif
+* /media/animated_portraits/{}_hq.gif
+* /media/animated_portraits/{}.mp4
+
 Rendering
 ---------
 For simple cards, `yarn extract` output a simple PNG. For animated cards,
