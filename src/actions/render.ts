@@ -216,7 +216,7 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
 
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
-    boolean: ['help', 'for-tsubaki'],
+    boolean: ['help', 'new-only', 'for-tsubaki'],
     string: ['still-dir', 'animated-dir']
   });
   
