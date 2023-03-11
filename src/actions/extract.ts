@@ -11,27 +11,39 @@ import { SpineAtlas } from "../models/spine-atlas";
 import { SpineSkeleton } from "../models/spine-skeleton";
 import { TEX } from "../models/tex";
 const cliProgress = require('cli-progress');
+import Sharp from 'sharp';
+
+const TSUBAKI_IMAGE_SIZE = [640, 388];
 
 function writeFile(out: string, name: string, data: Buffer) {
   fs.writeFileSync(join(out, name), data);
 }
 
-async function extract(in_file: string, out: string, newOnly: boolean, animatedOnly: boolean) {
+async function extract(in_file: string, stillOutDir: string | undefined, animatedOutDir: string | undefined, cardOutDir: string | undefined, newOnly: boolean, forTsubaki: boolean) {
   const name = basename(in_file, extname(in_file));
   const buf = fs.readFileSync(in_file);
 
   if (TEX.match(buf)) {
-    if (animatedOnly) {return;}
-    if (newOnly && fs.existsSync(join(out, `${name}.png`).toUpperCase())) {return;}
     const tex = TEX.load(buf);
+    const isCard = tex.entries[0].name.startsWith('CARDS');
+    let outDir = isCard ? cardOutDir : stillOutDir;
+    if (outDir === undefined) {return;}
     for (const entry of tex.entries) {
+      const idNo = entry.name.match(/[A-Z]+_0*(\d+)\.PNG/)![1];
+      const fname = forTsubaki ? isCard ? `cards_${idNo.padStart(3, '0')}.png` : `${idNo.padStart(5, '0')}.png` : entry.name;
+      if (newOnly && fs.existsSync(join(outDir, fname))) {continue;}
       const image = await TEX.decode(entry);
-      writeFile(out, entry.name, image);
+      if (!forTsubaki || isCard) {
+        writeFile(outDir, fname, image);
+      } else {
+        writeFile(outDir, fname, await tsubakiResize(image));
+      }
     }
   } else if (BBIN.match(buf)) {
+    if (animatedOutDir === undefined) {return;}
     const bbin = BBIN.load(buf);
 
-    if (newOnly && fs.existsSync(join(out, `${name}.json`))) {return;}
+    if (newOnly && fs.existsSync(join(animatedOutDir, `${name}.json`))) {return;}
     const images = new Map<string, Buffer>();
     let isc: ISC | null = null;
     const isas: ISA[] = [];
@@ -49,7 +61,7 @@ async function extract(in_file: string, out: string, newOnly: boolean, animatedO
       }
     }
     if (isc) {
-      await convertSpineModel(name, isc, isas, images, out);
+      await convertSpineModel(name, isc, isas, images, animatedOutDir);
     }
   }
 }
@@ -130,13 +142,25 @@ async function convertSpineModel(
   }
 }
 
+async function tsubakiResize(imageBuffer: Buffer) {
+  return await Sharp({create: {
+    width: TSUBAKI_IMAGE_SIZE[0],
+    height: TSUBAKI_IMAGE_SIZE[1],
+    channels: 4,
+    background: 'transparent',
+  }}).composite([{
+    input: await Sharp(imageBuffer).trim(1).toBuffer()
+  }]).png().toBuffer();
+}
+
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
-    boolean: ['help', 'animatedOnly', 'new-only', 'for-tsubaki']
+    boolean: ['help', 'new-only', 'for-tsubaki', 'quiet'],
+    string: ['still-dir', 'animated-dir', 'card-dir']
   });
 
-  if (parsedArgs._.length !== 2 || parsedArgs.help) {
-    console.log("usage: pad-visual-media extract <bin file> <output directory> [--animated-only] [--new-only] [--for-tsubaki]");
+  if (parsedArgs._.length !== 1 || parsedArgs.help) {
+    console.log("usage: pad-visual-media extract <bin file/path to bin files> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--card-dir <card output directory>] [--new-only] [--for-tsubaki] [--quiet]");
     return parsedArgs.help;
   }
 
@@ -152,11 +176,11 @@ export async function main(args: string[]) {
   }
 
   let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-  if (!parsedArgs['for-tsubaki']) {pbar.start(files.length, 0);}
+  if (!parsedArgs.quiet) {pbar.start(files.length, 0);}
   for (const file of files) {
-    await extract(file, parsedArgs._[1], parsedArgs['new-only'], parsedArgs['animated-only']);
-    if (!parsedArgs['for-tsubaki']) {pbar.increment();}
+    await extract(file, parsedArgs['still-dir'], parsedArgs['animated-dir'], parsedArgs['card-dir'], parsedArgs['new-only'], parsedArgs['for-tsubaki']);
+    if (!parsedArgs.quiet) {pbar.increment();}
   }
-  if (!parsedArgs['for-tsubaki']) {pbar.stop();}
+  if (!parsedArgs.quiet) {pbar.stop();}
   return true;
 }

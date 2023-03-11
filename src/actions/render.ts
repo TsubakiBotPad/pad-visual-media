@@ -17,7 +17,7 @@ INSERT INTO monster_image_sizes (monster_id, mp4_size, gif_size, hq_gif_size, ts
   VALUES (?, ?, ?, ?, UNIX_TIMESTAMP()) 
   ON DUPLICATE KEY UPDATE mp4_size = ?, gif_size = ?, hq_gif_size = ?, tstamp = UNIX_TIMESTAMP()`;
 
-async function render(jsonPath: string, outDir: string | undefined, singleDirectory: string | undefined, forTsubaki: boolean) {
+async function render(jsonPath: string, outDir: string | undefined, singleDirectory: string | undefined, quiet: boolean, forTsubaki: boolean) {
   const dataDir = path.dirname(jsonPath);
   const skeletonJson = fs.readFileSync(jsonPath).toString();
   const atlasText = fs.readFileSync(jsonPath.replace(/\.json$/, '.atlas')).toString();
@@ -33,27 +33,31 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
   gl.canvas = canvas;
 
   global.WebGLRenderingContext = gl.constructor;
-  spine.PolygonBatcher = class extends spine.PolygonBatcher {
+  const AdditivePolygonBatcher = class extends spine.PolygonBatcher {
+    constructor(context: any) {
+      super(context, false);
+    }
     begin(shader: any) {
       super.begin(shader);
       this.__setAdditive();
     }
-    setBlendMode(srcBlend: any, dstBlend: any) {
-      super.setBlendMode(srcBlend, dstBlend);
+    setBlendMode(srcColorBlend: any, srcAlphaBlend: any, dstBlend: any) {
+      super.setBlendMode(srcColorBlend, srcAlphaBlend, dstBlend);
       this.__setAdditive();
     }
     __setAdditive() {
-      if (!this.shader.context.gl.getUniformLocation(this.shader.program, "u_additive")) {
+      if (!gl.getUniformLocation(this.shader.program, "u_additive")) {
         return;
       }
       const isAdditive = this.dstBlend === gl.ONE;
+      console.log(isAdditive)
       this.shader.setUniformi("u_additive", isAdditive ? 1 : 0);
       if (isAdditive) {
         gl.blendFunc(gl.ONE, gl.ONE);
       }
     }
   };
-  spine.Shader.newColoredTextured = (context: any) => {
+  const AdditiveNewColoredTextured = (context: any) => {
     const vs = `
         attribute vec4 ${spine.Shader.POSITION};
         attribute vec4 ${spine.Shader.COLOR};
@@ -109,6 +113,8 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
   animationState.setAnimation(0, 'animation' in JSON.parse(skeletonJson).animations ? 'animation' : 'animation_01', true);
 
   const renderer = new spine.SceneRenderer(canvas, gl, false);
+  renderer.batcherShader = AdditiveNewColoredTextured(renderer.context)
+  renderer.batcher = new AdditivePolygonBatcher(renderer.context);
 
   renderer.camera.position.x = 0;
   renderer.camera.position.y = 150;
@@ -153,12 +159,12 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
     try {fs.mkdirSync(cacheDir);} catch (e) {}
     
     console.log(`Generating frames for ${animName} (${duration.toFixed(2)}s at ${FRAME_RATE} FPS).`);
-    if (!forTsubaki) {
+    if (!quiet) {
       pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
       pbar.start(Number(duration.toFixed(2)), 0);
     }
     while (time < duration) {
-      if (!forTsubaki) {pbar.update(Number(time.toFixed(2)))};
+      if (!quiet) {pbar.update(Number(time.toFixed(2)))};
       let fp = path.join(cacheDir, `${animName}-${padStart(i.toString(), padding, '0')}.png`);
       files.push(fp);
       promises.push(renderImg(fp));
@@ -167,7 +173,7 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
       animationState.update(delta);
     }
     await Promise.all(promises);
-    if (!forTsubaki) {pbar.update(Number(duration.toFixed(2))); pbar.stop();}
+    if (!quiet) {pbar.update(Number(duration.toFixed(2))); pbar.stop();}
     
     console.log("Generating Files...");
     let mp4FFmpegArgs = ['-r', `${FRAME_RATE}`, 
@@ -216,12 +222,12 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
 
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
-    boolean: ['help', 'for-tsubaki'],
+    boolean: ['help', 'new-only', 'for-tsubaki', 'quiet'],
     string: ['still-dir', 'animated-dir']
   });
   
   if (parsedArgs._.length !== 1 || parsedArgs.help) {
-    console.log("usage: pad-visual-media render <skeleton JSON> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--new-only] [--for-tsubaki]");
+    console.log("usage: pad-visual-media render <skeleton JSON> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--new-only] [--for-tsubaki] [--quiet]");
     return parsedArgs.help;
   }
 
@@ -240,16 +246,16 @@ export async function main(args: string[]) {
 
   // TODO: Add progress bar for files
   let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-  if (!parsedArgs['for-tsubaki']) {pbar.start(files.length, 0);}
+  if (!parsedArgs.quiet) {pbar.start(files.length, 0);}
   for (const file of files) {
-    if (!parsedArgs['for-tsubaki']) {pbar.increment();}
+    if (!parsedArgs.quiet) {pbar.increment();}
     if (parsedArgs['new-only']) {
       let base = path.basename(file, path.extname(file));
       if (fs.existsSync(path.join(parsedArgs['animated-dir'] ?? '-', `${base}.tomb`))) {continue;}
     }
-    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['for-tsubaki']);
+    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki']);
   }
-  if (!parsedArgs['for-tsubaki']) {pbar.stop();}
+  if (!parsedArgs.quiet) {pbar.stop();}
 
   return true;
 }
