@@ -1,4 +1,3 @@
-
 import { downloadBaseJson } from '../downloader/base';
 import { downloadBc } from '../downloader/bc';
 import { downloadExtlist } from '../downloader/extlist';
@@ -7,7 +6,7 @@ import minimist from "minimist";
 const cliProgress = require('cli-progress');
 const Semaphore = require('ts-semaphore')
 
-async function update(server: string, outDir: string, newOnly: boolean, useAndroid: boolean, monsIds: number[], cardIds: number[], useProgressBar: boolean) {
+async function update(outDir: string, server: string, newOnly: boolean, useAndroid: boolean, monsIds: number[], cardIds: number[], useProgressBar: boolean) {
   const baseJson = await downloadBaseJson(server.toUpperCase(), useAndroid);
   const extlist = Extlist.load(await downloadExtlist(baseJson.extlist));
 
@@ -37,8 +36,8 @@ export async function main(args: string[]) {
     string: ['server', 'mons', 'cards'],
   });
 
-  if (parsedArgs._.length !== 2 || parsedArgs.help) {
-    console.log("usage: pad-visual-media update <server> <out directory> [--mons 'list, of, ids'] [--cards 'list, of, ids'] [--new-only] [--use-android] [--for-tsubaki (unused)] [--quiet]");
+  if (parsedArgs._.length !== 1 || parsedArgs.help || parsedArgs.server === undefined) {
+    console.log("usage: pad-visual-media update <out directory> --server <server> [--mons 'list, of, ids'] [--cards 'list, of, ids'] [--new-only] [--use-android] [--for-tsubaki (unused)] [--quiet]");
     return parsedArgs.help;
   }
   
@@ -50,7 +49,7 @@ export async function main(args: string[]) {
   if (parsedArgs.cards !== undefined) {
     cardIds = parsedArgs.cards.match(/\d+/g).map((id: string) => parseInt(id));
   }
-  await update(parsedArgs._[0], parsedArgs._[1], parsedArgs['new-only'], parsedArgs['use-android'], monsIds, cardIds, !parsedArgs['quiet']);
+  await update(parsedArgs._[0], parsedArgs['server'], parsedArgs['new-only'], parsedArgs['use-android'], monsIds, cardIds, !parsedArgs['quiet']);
 
   return true;
 }

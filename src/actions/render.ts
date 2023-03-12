@@ -6,6 +6,7 @@ const sharp = require('sharp');
 import { padStart } from 'lodash';
 import { glob } from "glob";
 const { spine } = require('../spine-webgl');
+import { formatTsubakiFile } from '../utils';
 
 import { spawnSync, spawn } from 'child_process';
 const cliProgress = require('cli-progress');
@@ -17,7 +18,7 @@ INSERT INTO monster_image_sizes (monster_id, mp4_size, gif_size, hq_gif_size, ts
   VALUES (?, ?, ?, ?, UNIX_TIMESTAMP()) 
   ON DUPLICATE KEY UPDATE mp4_size = ?, gif_size = ?, hq_gif_size = ?, tstamp = UNIX_TIMESTAMP()`;
 
-async function render(jsonPath: string, outDir: string | undefined, singleDirectory: string | undefined, quiet: boolean, forTsubaki: boolean) {
+async function render(jsonPath: string, outDir: string | undefined, singleDirectory: string | undefined, quiet: boolean, forTsubaki: boolean, server: string) {
   const dataDir = path.dirname(jsonPath);
   const skeletonJson = fs.readFileSync(jsonPath).toString();
   const atlasText = fs.readFileSync(jsonPath.replace(/\.json$/, '.atlas')).toString();
@@ -50,7 +51,6 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
         return;
       }
       const isAdditive = this.dstBlend === gl.ONE;
-      console.log(isAdditive)
       this.shader.setUniformi("u_additive", isAdditive ? 1 : 0);
       if (isAdditive) {
         gl.blendFunc(gl.ONE, gl.ONE);
@@ -140,7 +140,7 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
 
   let base = path.basename(jsonPath, path.extname(jsonPath));
   let animName = base;
-  if (forTsubaki) {animName = padStart(base.replace(/^mons_0*/, ""), 5, '0');}
+  if (forTsubaki) {animName = padStart(await formatTsubakiFile(base.replace(/^mons_0*/, ""), server), 5, '0');}
 
   if (singleDirectory !== undefined) {
     await renderImg(path.join(singleDirectory, `${animName}.png`));
@@ -223,11 +223,11 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
     boolean: ['help', 'new-only', 'for-tsubaki', 'quiet'],
-    string: ['still-dir', 'animated-dir']
+    string: ['still-dir', 'animated-dir', 'server']
   });
   
   if (parsedArgs._.length !== 1 || parsedArgs.help) {
-    console.log("usage: pad-visual-media render <skeleton JSON> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--new-only] [--for-tsubaki] [--quiet]");
+    console.log("usage: pad-visual-media render <skeleton JSON> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--new-only] [--for-tsubaki --server <server>] [--quiet]");
     return parsedArgs.help;
   }
 
@@ -242,20 +242,18 @@ export async function main(args: string[]) {
     files.push(...glob.sync(parsedArgs._[0]));
   }
 
-  if (files.length == 0) {console.log("No files specified."); return false;}
+  if (files.length == 0) {console.log("No files specified.");}
 
   // TODO: Add progress bar for files
-  let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-  if (!parsedArgs.quiet) {pbar.start(files.length, 0);}
+  let n = 1;
   for (const file of files) {
-    if (!parsedArgs.quiet) {pbar.increment();}
+    console.log(`Doing file ${file} (${n++}/${files.length})`);
     if (parsedArgs['new-only']) {
       let base = path.basename(file, path.extname(file));
       if (fs.existsSync(path.join(parsedArgs['animated-dir'] ?? '-', `${base}.tomb`))) {continue;}
     }
-    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki']);
+    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
-  if (!parsedArgs.quiet) {pbar.stop();}
 
   return true;
 }

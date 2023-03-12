@@ -10,6 +10,7 @@ import { loadISA, loadISC } from "../models/spine";
 import { SpineAtlas } from "../models/spine-atlas";
 import { SpineSkeleton } from "../models/spine-skeleton";
 import { TEX } from "../models/tex";
+import { formatTsubakiFile } from '../utils';
 const cliProgress = require('cli-progress');
 import Sharp from 'sharp';
 
@@ -19,7 +20,7 @@ function writeFile(out: string, name: string, data: Buffer) {
   fs.writeFileSync(join(out, name), data);
 }
 
-async function extract(in_file: string, stillOutDir: string | undefined, animatedOutDir: string | undefined, cardOutDir: string | undefined, newOnly: boolean, forTsubaki: boolean) {
+async function extract(in_file: string, stillOutDir: string | undefined, animatedOutDir: string | undefined, cardOutDir: string | undefined, newOnly: boolean, forTsubaki: boolean, server: string) {
   const name = basename(in_file, extname(in_file));
   const buf = fs.readFileSync(in_file);
 
@@ -30,7 +31,10 @@ async function extract(in_file: string, stillOutDir: string | undefined, animate
     if (outDir === undefined) {return;}
     for (const entry of tex.entries) {
       const idNo = entry.name.match(/[A-Z]+_0*(\d+)\.PNG/)![1];
-      const fname = forTsubaki ? isCard ? `cards_${idNo.padStart(3, '0')}.png` : `${idNo.padStart(5, '0')}.png` : entry.name;
+      const fname = forTsubaki ? 
+                          isCard ? `cards_${idNo.padStart(3, '0')}.png` 
+                                 : await `${(await formatTsubakiFile(idNo, server)).padStart(5, '0')}.png` 
+                               : entry.name;
       if (newOnly && fs.existsSync(join(outDir, fname))) {continue;}
       const image = await TEX.decode(entry);
       if (!forTsubaki || isCard) {
@@ -149,18 +153,18 @@ async function tsubakiResize(imageBuffer: Buffer) {
     channels: 4,
     background: 'transparent',
   }}).composite([{
-    input: await Sharp(imageBuffer).trim(1).toBuffer()
+    input: await Sharp(imageBuffer).trim('transparent').toBuffer()
   }]).png().toBuffer();
 }
 
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
     boolean: ['help', 'new-only', 'for-tsubaki', 'quiet'],
-    string: ['still-dir', 'animated-dir', 'card-dir']
+    string: ['still-dir', 'animated-dir', 'card-dir', 'server']
   });
 
   if (parsedArgs._.length !== 1 || parsedArgs.help) {
-    console.log("usage: pad-visual-media extract <bin file/path to bin files> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--card-dir <card output directory>] [--new-only] [--for-tsubaki] [--quiet]");
+    console.log("usage: pad-visual-media extract <bin file/path to bin files> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--card-dir <card output directory>] [--new-only] [--for-tsubaki --server <server>] [--quiet]");
     return parsedArgs.help;
   }
 
@@ -178,7 +182,7 @@ export async function main(args: string[]) {
   let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
   if (!parsedArgs.quiet) {pbar.start(files.length, 0);}
   for (const file of files) {
-    await extract(file, parsedArgs['still-dir'], parsedArgs['animated-dir'], parsedArgs['card-dir'], parsedArgs['new-only'], parsedArgs['for-tsubaki']);
+    await extract(file, parsedArgs['still-dir'], parsedArgs['animated-dir'], parsedArgs['card-dir'], parsedArgs['new-only'], parsedArgs['for-tsubaki'], parsedArgs['server']);
     if (!parsedArgs.quiet) {pbar.increment();}
   }
   if (!parsedArgs.quiet) {pbar.stop();}
