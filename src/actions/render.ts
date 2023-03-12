@@ -140,7 +140,7 @@ async function render(jsonPath: string, animatedDir: string | undefined, singleD
 
   let base = path.basename(jsonPath, path.extname(jsonPath));
   let animName = base;
-  if (forTsubaki) {animName = padStart(await formatTsubakiFile(base.replace(/^mons_0*/, ""), server), 5, '0');}
+  if (forTsubaki) {animName = await formatTsubakiFile(base.replace(/^mons_0*/, ""), server);}
 
   if (singleDir !== undefined) {
     await renderImg(path.join(singleDir, `${animName}.png`));
@@ -249,7 +249,7 @@ export async function main(args: string[]) {
   for (const file of files) {
     if (parsedArgs['new-only']) {      
       const monsterId = await formatTsubakiFile(path.basename(file, path.extname(file)).substring(5), parsedArgs['server']);
-      if (fs.existsSync(path.join(parsedArgs['tomb-dir'] ?? '-', `${monsterId.padStart(5, '0')}.tomb`))) {continue;}
+      if (fs.existsSync(path.join(parsedArgs['tomb-dir'] ?? '-', `${monsterId}.tomb`))) {continue;}
     }
     console.log(`Generating animation ${path.basename(file)} (${n++}/${files.length})`);
     await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
