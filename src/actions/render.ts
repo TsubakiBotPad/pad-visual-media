@@ -214,7 +214,7 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
                       '--exclude', '*', '--include', `${animName}.mp4`,
                       '--include', `${animName}.gif`, '--include', `${animName}_hq.gif`];
       await spawn('aws', s3Args);
-      await fs.closeSync(fs.openSync(path.join(outDir, `${base}.tomb`), 'w'));
+      await fs.closeSync(fs.openSync(path.join(outDir, `${animName}.tomb`), 'w'));
     }
   }
 }
@@ -248,9 +248,9 @@ export async function main(args: string[]) {
   let n = 1;
   for (const file of files) {
     console.log(`Doing file ${file} (${n++}/${files.length})`);
-    if (parsedArgs['new-only']) {
-      let base = path.basename(file, path.extname(file));
-      if (fs.existsSync(path.join(parsedArgs['animated-dir'] ?? '-', `${base}.tomb`))) {continue;}
+    if (parsedArgs['new-only']) {      
+      const monsterId = await formatTsubakiFile(path.basename(file, path.extname(file)).substring(5), parsedArgs['server']);
+      if (fs.existsSync(path.join(parsedArgs['animated-dir'] ?? '-', `${monsterId}.tomb`))) {continue;}
     }
     await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
