@@ -147,13 +147,24 @@ async function convertSpineModel(
 }
 
 async function tsubakiResize(imageBuffer: Buffer) {
+  let img = Sharp(imageBuffer);
+  let {width, height} = await img.metadata();
+  let trimmedImg = Sharp(await Sharp(await img.toBuffer()).trim('transparent').toBuffer());
+  let {height: trimmedHeight} = await trimmedImg.metadata();
+
+  if (trimmedHeight! > TSUBAKI_IMAGE_SIZE[1]) {
+    img = Sharp(await img.extract({
+      left: 0, top: 0,
+      width: width!, height: height! / 2
+    }).toBuffer());
+  }
   return await Sharp({create: {
     width: TSUBAKI_IMAGE_SIZE[0],
     height: TSUBAKI_IMAGE_SIZE[1],
     channels: 4,
     background: 'transparent',
   }}).composite([{
-    input: await Sharp(imageBuffer).trim('transparent').toBuffer()
+    input: await img.trim('transparent').toBuffer()
   }]).png().toBuffer();
 }
 
@@ -178,6 +189,7 @@ export async function main(args: string[]) {
   } else {
     files.push(...glob.sync(parsedArgs._[0]));
   }
+  files.sort();
 
   let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
   if (!parsedArgs.quiet) {pbar.start(files.length, 0);}
