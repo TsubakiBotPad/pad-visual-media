@@ -20,8 +20,9 @@ export function formatTsubakiFile(monster_no: string, server: string | undefined
   var con = mysql.createConnection(config);
   return new Promise(function(resolve, reject){
     con.query(mysql.format(SQL_QUERY, [parseInt(monster_no), SERVERS.indexOf(parsedServer)]), function (err: string, rows: any) {
-      if (err) {reject(new Error(err)); return;}
-      if (rows.length === 0) {
+      if (err) {
+        reject(new Error(err)); return;
+      } else if (rows.length === 0) {
         resolve(`${parsedServer}_${monster_no.padStart(5, '0')}`);
       } else {
         resolve(`${rows[0].monster_id}`.padStart(5, '0'));
