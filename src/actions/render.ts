@@ -247,11 +247,11 @@ export async function main(args: string[]) {
   // TODO: Add progress bar for files
   let n = 1;
   for (const file of files) {
-    console.log(`Doing file ${file} (${n++}/${files.length})`);
     if (parsedArgs['new-only']) {      
       const monsterId = await formatTsubakiFile(path.basename(file, path.extname(file)).substring(5), parsedArgs['server']);
-      if (fs.existsSync(path.join(parsedArgs['tomb-dir'] ?? '-', `${monsterId}.tomb`))) {continue;}
+      if (fs.existsSync(path.join(parsedArgs['tomb-dir'] ?? '-', `${monsterId.padStart(5, '0')}.tomb`))) {continue;}
     }
+    console.log(`Generating animation ${path.basename(file)} (${n++}/${files.length})`);
     await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
 
