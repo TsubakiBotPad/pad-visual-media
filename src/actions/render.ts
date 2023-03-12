@@ -18,7 +18,7 @@ INSERT INTO monster_image_sizes (monster_id, mp4_size, gif_size, hq_gif_size, ts
   VALUES (?, ?, ?, ?, UNIX_TIMESTAMP()) 
   ON DUPLICATE KEY UPDATE mp4_size = ?, gif_size = ?, hq_gif_size = ?, tstamp = UNIX_TIMESTAMP()`;
 
-async function render(jsonPath: string, outDir: string | undefined, singleDirectory: string | undefined, quiet: boolean, forTsubaki: boolean, server: string) {
+async function render(jsonPath: string, animatedDir: string | undefined, singleDir: string | undefined, tombstoneDir: string | undefined, quiet: boolean, forTsubaki: boolean, server: string) {
   const dataDir = path.dirname(jsonPath);
   const skeletonJson = fs.readFileSync(jsonPath).toString();
   const atlasText = fs.readFileSync(jsonPath.replace(/\.json$/, '.atlas')).toString();
@@ -142,10 +142,10 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
   let animName = base;
   if (forTsubaki) {animName = padStart(await formatTsubakiFile(base.replace(/^mons_0*/, ""), server), 5, '0');}
 
-  if (singleDirectory !== undefined) {
-    await renderImg(path.join(singleDirectory, `${animName}.png`));
+  if (singleDir !== undefined) {
+    await renderImg(path.join(singleDir, `${animName}.png`));
   } 
-  if (outDir !== undefined) {
+  if (animatedDir !== undefined) {
     const duration = animationState.getCurrent(0).animation.duration;
     const padding = Math.ceil(duration * FRAME_RATE).toString().length;
     let time = 0;
@@ -155,7 +155,7 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
     let files = [];
     let promises = [];
 
-    const cacheDir = path.join(outDir, 'cache');
+    const cacheDir = path.join(animatedDir, 'cache');
     try {fs.mkdirSync(cacheDir);} catch (e) {}
     
     console.log(`Generating frames for ${animName} (${duration.toFixed(2)}s at ${FRAME_RATE} FPS).`);
@@ -180,15 +180,15 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
                         '-i', path.join(cacheDir, `${animName}-%0${padding}d.png`), 
                         '-c:v', 'libx264', '-r', `${FRAME_RATE}`, '-pix_fmt', 'yuv420p',
                         '-loglevel', 'error', '-hide_banner', '-y',
-                        path.join(outDir, `${animName}.mp4`)];
+                        path.join(animatedDir, `${animName}.mp4`)];
     spawnSync('ffmpeg', mp4FFmpegArgs);
     console.log(`${animName}.mp4`);
-    let hqGifFFmpegArgs = ['-i', `${path.join(outDir, `${animName}.mp4`)}`, '-r', '30',
+    let hqGifFFmpegArgs = ['-i', `${path.join(animatedDir, `${animName}.mp4`)}`, '-r', '30',
                            '-loglevel', 'error', '-hide_banner', '-y',
-                        path.join(outDir, `${animName}_hq.gif`)];    
-    let gifFFmpegArgs = ['-i', `${path.join(outDir, `${animName}.mp4`)}`, '-r', '10', '-s', '426x258',
+                        path.join(animatedDir, `${animName}_hq.gif`)];    
+    let gifFFmpegArgs = ['-i', `${path.join(animatedDir, `${animName}.mp4`)}`, '-r', '10', '-s', '426x258',
                         '-loglevel', 'error', '-hide_banner', '-y',
-                        path.join(outDir, `${animName}.gif`)];
+                        path.join(animatedDir, `${animName}.gif`)];
     
     
     await Promise.all([
@@ -201,20 +201,20 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
       const config = require('../../db_config.json');
       var con = mysql.createConnection(config);
       const sizes = [
-        fs.statSync(path.join(outDir, `${animName}.mp4`)).size,
-        fs.statSync(path.join(outDir, `${animName}.gif`)).size,
-        fs.statSync(path.join(outDir, `${animName}_hq.gif`)).size
+        fs.statSync(path.join(animatedDir, `${animName}.mp4`)).size,
+        fs.statSync(path.join(animatedDir, `${animName}.gif`)).size,
+        fs.statSync(path.join(animatedDir, `${animName}_hq.gif`)).size
       ];
       const fmt = [parseInt(animName)].concat(sizes, sizes);
       con.connect();
       con.query(mysql.format(QUERY, fmt), function (err: string) {if (err) console.log(err);});
       con.end();
 
-      const s3Args = ['s3', 'mv', '--acl=private', outDir, config.awsPath, '--recursive', 
+      const s3Args = ['s3', 'mv', '--acl=private', animatedDir, config.awsPath, '--recursive', 
                       '--exclude', '*', '--include', `${animName}.mp4`,
                       '--include', `${animName}.gif`, '--include', `${animName}_hq.gif`];
       await spawn('aws', s3Args);
-      await fs.closeSync(fs.openSync(path.join(outDir, `${animName}.tomb`), 'w'));
+      await fs.closeSync(fs.openSync(path.join(tombstoneDir, `${animName}.tomb`), 'w'));
     }
   }
 }
@@ -223,11 +223,11 @@ async function render(jsonPath: string, outDir: string | undefined, singleDirect
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
     boolean: ['help', 'new-only', 'for-tsubaki', 'quiet'],
-    string: ['still-dir', 'animated-dir', 'server']
+    string: ['still-dir', 'animated-dir', 'tomb-dir', 'server']
   });
   
   if (parsedArgs._.length !== 1 || parsedArgs.help) {
-    console.log("usage: pad-visual-media render <skeleton JSON> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--new-only] [--for-tsubaki --server <server>] [--quiet]");
+    console.log("usage: pad-visual-media render <skeleton JSON> [--animated-dir <animated output directory>] [--still-dir <still output directory>] [--new-only] [--for-tsubaki --server <server> [--tomb-dir <tombstone output directory>]] [--quiet]");
     return parsedArgs.help;
   }
 
@@ -250,9 +250,9 @@ export async function main(args: string[]) {
     console.log(`Doing file ${file} (${n++}/${files.length})`);
     if (parsedArgs['new-only']) {      
       const monsterId = await formatTsubakiFile(path.basename(file, path.extname(file)).substring(5), parsedArgs['server']);
-      if (fs.existsSync(path.join(parsedArgs['animated-dir'] ?? '-', `${monsterId}.tomb`))) {continue;}
+      if (fs.existsSync(path.join(parsedArgs['tomb-dir'] ?? '-', `${monsterId}.tomb`))) {continue;}
     }
-    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
+    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
 
   return true;
