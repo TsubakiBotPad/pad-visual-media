@@ -40,12 +40,12 @@ async function update(outDir: string, server: string, newOnly: boolean, useAndro
 
 export async function main(args: string[]) {
   const parsedArgs = minimist(args, {
-    boolean: ['new-only', 'for-tsubaki', 'help', 'quiet', 'use-android', 'prevent-leaks'],
+    boolean: ['new-only', 'for-tsubaki', 'help', 'quiet', 'use-android'],
     string: ['server', 'mons', 'cards'],
   });
 
   if (parsedArgs._.length !== 1 || parsedArgs.help || parsedArgs.server === undefined) {
-    console.log("usage: pad-visual-media update <out directory> --server <server> [--mons 'list, of, ids'] [--cards 'list, of, ids'] [--new-only] [--use-android] [--for-tsubaki [--prevent-leaks]] [--quiet]");
+    console.log("usage: pad-visual-media update <out directory> --server <server> [--mons 'list, of, ids'] [--cards 'list, of, ids'] [--new-only] [--use-android] [--for-tsubaki] [--quiet]");
     return parsedArgs.help;
   }
 
@@ -57,7 +57,7 @@ export async function main(args: string[]) {
   if (parsedArgs.cards !== undefined) {
     cardIds = parsedArgs.cards.match(/\d+/g).map((id: string) => parseInt(id));
   }
-  await update(parsedArgs._[0], parsedArgs['server'], parsedArgs['new-only'], parsedArgs['use-android'], parsedArgs['prevent-leaks'], monsIds, cardIds, parsedArgs['quiet']);
+  await update(parsedArgs._[0], parsedArgs['server'], parsedArgs['new-only'], parsedArgs['use-android'], parsedArgs['for-tsubaki'], monsIds, cardIds, parsedArgs['quiet']);
 
   return true;
 }
