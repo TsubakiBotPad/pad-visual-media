@@ -1,9 +1,7 @@
 const mysql = require('mysql');
 
 const SERVERS = ['JP', 'NA', 'KR'];
-const SQL_QUERY = `
-SELECT monster_id FROM canonical_monster_ids
-  WHERE monster_no = ? AND server_id = ?`;
+var TSUBAKI_IDS: any = undefined;
 
 export function readASCII(buf: Buffer, offset: number) {
   let str = '';
@@ -12,21 +10,35 @@ export function readASCII(buf: Buffer, offset: number) {
   return str;
 }
 
-export function formatTsubakiFile(monster_no: string, server: string | undefined): Promise<string> {
+export async function formatTsubakiFile(monster_no: string, server: string | undefined): Promise<string> {
   const parsedServer = (server ?? 'JP').toUpperCase();
   if (parsedServer === 'HT') {throw new Error("HT is not supported in Tsubaki");}
   if (SERVERS.indexOf(parsedServer) === -1) {throw new Error("Invalid server: " + parsedServer);}
-  const config = require('../db_config.json');
-  var con = mysql.createConnection(config);
-  return new Promise(function(resolve, reject){
-    con.query(mysql.format(SQL_QUERY, [parseInt(monster_no), SERVERS.indexOf(parsedServer)]), function (err: string, rows: any) {
-      if (err) {reject(new Error(err)); return;}
-      if (rows.length === 0) {
-        resolve(`${server}_${monster_no.padStart(5, '0')}`);
-      } else {
-        resolve(`${rows[0].monster_id}`.padStart(5, '0'));
-      }
-      con.end();
-    })
-  });
+
+  if (TSUBAKI_IDS === undefined) {
+    TSUBAKI_IDS = {};
+    console.log("Generating ID mapping...")
+    const config = require('../db_config.json');
+    var con = mysql.createConnection(config);
+    await new Promise(function(resolve, reject){
+      con.query("SELECT * FROM canonical_monster_ids", function (err: string, rows: any) {
+        if (err) {
+          reject(new Error(err)); 
+        } else {
+          rows.forEach((r: any) => {
+            TSUBAKI_IDS[String([r.monster_no, r.server_id])] = r.monster_id;
+          });
+          resolve(1);
+        }
+        con.end();
+      });
+    });
+  }
+
+  let key = String([parseInt(monster_no), SERVERS.indexOf(parsedServer)]);
+  if (!(key in TSUBAKI_IDS)) {
+    return `${parsedServer}_${monster_no.padStart(5, '0')}`;
+  } else {
+    return `${TSUBAKI_IDS[key]}`.padStart(5, '0');
+  }
 }
