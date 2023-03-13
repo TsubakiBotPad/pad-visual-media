@@ -244,7 +244,6 @@ export async function main(args: string[]) {
 
   if (files.length == 0) {console.log("No files specified.");}
 
-  // TODO: Add progress bar for files
   let n = 1;
   for (const file of files) {
     if (parsedArgs['new-only']) {      
