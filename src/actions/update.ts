@@ -13,7 +13,11 @@ async function update(outDir: string, server: string, newOnly: boolean, useAndro
 
   let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
   if (!quiet) {pbar.start(extlist.entries.length, 0);}
-  const semaphore = new Semaphore(25)
+  const semaphore = new Semaphore(25);
+
+  // Generate ID mapping.  Tyrra is in every server
+  await formatTsubakiFile('1', server);
+  
   const downloadFns = extlist.entries.map((entry) => semaphore.use(async () => {
     if (noLeaks && !entry.isCards) {
       if ((await formatTsubakiFile(`${entry.id}`, server)).startsWith((server ?? 'JP').toUpperCase())) {
