@@ -34,6 +34,42 @@ Usage
   * `--tomb-dir` Place to put animated tombstones (Tsubaki only)
   * `--quiet` Don't show progress bars.
 
+```bash
+# Normal Config
+yarn update "./raw_data" --server <server>
+
+yarn extract "./raw_data" \
+  --still-dir "./portraits" \
+  --card-dir "./cards" \
+  --animated-dir "./spine_files"
+
+yarn render "./spine_files" \
+  --animated-dir "./animated_portraits" \
+  --still-dir "./portraits"
+```
+
+```bash
+# Tsubaki Config
+
+# This setup is what's used on the Tsubaki server. 
+#  It will not work unless you have a full pipeline set up.
+
+yarn update "./raw_data" \
+  --new-only --for-tsubaki --server <server> --quiet
+
+yarn extract "./raw_data" \
+  --still-dir "./portraits" \
+  --card-dir "./cards" \
+  --animated-dir "./spine_files" \
+  --new-only --for-tsubaki --server <server> --quiet
+
+yarn render "./spine_files" \
+  --animated-dir "./animated_portraits" \
+  --still-dir "./portraits" \
+  --tomb-dir "./animated_tombstones" \
+  --new-only --for-tsubaki --server <server> --quiet
+```
+
 File locations
 ---------
 
