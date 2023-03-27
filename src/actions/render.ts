@@ -19,10 +19,23 @@ INSERT INTO monster_image_sizes (monster_id, mp4_size, gif_size, hq_gif_size, ts
   ON DUPLICATE KEY UPDATE mp4_size = ?, gif_size = ?, hq_gif_size = ?, tstamp = UNIX_TIMESTAMP()`;
 
 async function render(jsonPath: string, animatedDir: string | undefined, singleDir: string | undefined, tombstoneDir: string | undefined, newOnly: boolean, quiet: boolean, forTsubaki: boolean, server: string) {
+  let base = path.basename(jsonPath, path.extname(jsonPath));
+  let animName = base;
+  if (forTsubaki) {animName = await formatTsubakiFile(base.replace(/^mons_0*/, ""), server);}
+
+  if (newOnly
+    && (singleDir === undefined || fs.existsSync(path.join(singleDir, `${animName}.png`))) 
+    && (animatedDir === undefined || 
+        fs.existsSync(forTsubaki 
+                       ? path.join(tombstoneDir, `${animName}.tomb`) 
+                       : path.join(animatedDir, `${animName}_hq.gif`)))) {
+    return;
+  }
+
   const dataDir = path.dirname(jsonPath);
   const skeletonJson = fs.readFileSync(jsonPath).toString();
   const atlasText = fs.readFileSync(jsonPath.replace(/\.json$/, '.atlas')).toString();
-  
+
   const canvas = {
     width: 640, height: 388,
     clientWidth: 640, clientHeight: 388,
@@ -138,10 +151,6 @@ async function render(jsonPath: string, animatedDir: string | undefined, singleD
     }
   }
 
-  let base = path.basename(jsonPath, path.extname(jsonPath));
-  let animName = base;
-  if (forTsubaki) {animName = await formatTsubakiFile(base.replace(/^mons_0*/, ""), server);}
-
   if (singleDir !== undefined) {
     let stillPath = path.join(singleDir, `${animName}.png`);
     if (!newOnly || !fs.existsSync(stillPath)) {
@@ -256,7 +265,6 @@ export async function main(args: string[]) {
 
   let n = 1;
   for (const file of files) {
-    console.log(`Generating animation ${path.basename(file)} (${n++}/${files.length})`);
     await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['new-only'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
 
