@@ -144,7 +144,7 @@ async function render(jsonPath: string, animatedDir: string | undefined, singleD
 
   if (singleDir !== undefined) {
     let stillPath = path.join(singleDir, `${animName}.png`);
-    if (!newOnly || fs.existsSync(stillPath)) {
+    if (!newOnly || !fs.existsSync(stillPath)) {
       await renderImg(stillPath);
     }
   } 
