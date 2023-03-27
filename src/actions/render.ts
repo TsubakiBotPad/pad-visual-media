@@ -18,7 +18,7 @@ INSERT INTO monster_image_sizes (monster_id, mp4_size, gif_size, hq_gif_size, ts
   VALUES (?, ?, ?, ?, UNIX_TIMESTAMP()) 
   ON DUPLICATE KEY UPDATE mp4_size = ?, gif_size = ?, hq_gif_size = ?, tstamp = UNIX_TIMESTAMP()`;
 
-async function render(jsonPath: string, animatedDir: string | undefined, singleDir: string | undefined, tombstoneDir: string | undefined, quiet: boolean, forTsubaki: boolean, server: string) {
+async function render(jsonPath: string, animatedDir: string | undefined, singleDir: string | undefined, tombstoneDir: string | undefined, newOnly: boolean, quiet: boolean, forTsubaki: boolean, server: string) {
   const dataDir = path.dirname(jsonPath);
   const skeletonJson = fs.readFileSync(jsonPath).toString();
   const atlasText = fs.readFileSync(jsonPath.replace(/\.json$/, '.atlas')).toString();
@@ -143,9 +143,19 @@ async function render(jsonPath: string, animatedDir: string | undefined, singleD
   if (forTsubaki) {animName = await formatTsubakiFile(base.replace(/^mons_0*/, ""), server);}
 
   if (singleDir !== undefined) {
-    await renderImg(path.join(singleDir, `${animName}.png`));
+    let stillPath = path.join(singleDir, `${animName}.png`);
+    if (!newOnly || fs.existsSync(stillPath)) {
+      await renderImg(stillPath);
+    }
   } 
   if (animatedDir !== undefined) {
+    if (newOnly) {
+      if (forTsubaki && fs.existsSync(path.join(tombstoneDir, `${animName}.tomb`))) {
+        return;
+      } else if (!forTsubaki && fs.existsSync(path.join(animatedDir, `${animName}_hq.gif`))) {
+        return;
+      }
+    }
     const duration = animationState.getCurrent(0).animation.duration;
     const padding = Math.ceil(duration * FRAME_RATE).toString().length;
     let time = 0;
@@ -246,12 +256,8 @@ export async function main(args: string[]) {
 
   let n = 1;
   for (const file of files) {
-    if (parsedArgs['new-only']) {      
-      const monsterId = await formatTsubakiFile(path.basename(file, path.extname(file)).substring(5), parsedArgs['server']);
-      if (fs.existsSync(path.join(parsedArgs['tomb-dir'] ?? '-', `${monsterId}.tomb`))) {continue;}
-    }
     console.log(`Generating animation ${path.basename(file)} (${n++}/${files.length})`);
-    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
+    await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['new-only'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
 
   return true;
