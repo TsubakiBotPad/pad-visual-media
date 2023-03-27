@@ -263,7 +263,6 @@ export async function main(args: string[]) {
 
   if (files.length == 0) {console.log("No files specified.");}
 
-  let n = 1;
   for (const file of files) {
     await render(file, parsedArgs['animated-dir'], parsedArgs['still-dir'], parsedArgs['tomb-dir'], parsedArgs['new-only'], parsedArgs['quiet'], parsedArgs['for-tsubaki'], parsedArgs['server']);
   }
