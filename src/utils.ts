@@ -36,9 +36,11 @@ export async function formatTsubakiFile(monster_no: string, server: string | und
   }
 
   let key = String([parseInt(monster_no), SERVERS.indexOf(parsedServer)]);
-  if (!(key in TSUBAKI_IDS)) {
-    return `${parsedServer}_${monster_no.padStart(5, '0')}`;
-  } else {
+  if (key in TSUBAKI_IDS) {
     return `${TSUBAKI_IDS[key]}`.padStart(5, '0');
+  } else if (parsedServer === 'JP') {
+    return `${monster_no.padStart(5, '0')}`;
+  } else {
+    return `${parsedServer}_${monster_no.padStart(5, '0')}`;
   }
 }
