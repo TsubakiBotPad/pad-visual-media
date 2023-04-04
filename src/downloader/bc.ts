@@ -10,7 +10,7 @@ export async function downloadBc(binPath: string, extlist: string, entry: Extlis
                                  newOnly: boolean): Promise<boolean> {
   const key = `${entry.isCards ? 'cards' : 'mons'}_${padStart(entry.id.toString(), 3, '0')}`;
 
-  if (newOnly && existsSync(join(binPath, `${key}.bin`))) {return false;}
+  if (newOnly && !entry.isCards && existsSync(join(binPath, `${key}.bin`))) {return false;}
 
   const data = (await Axios.get(`${key}.bc`, {
     baseURL: extlist,
