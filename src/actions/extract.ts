@@ -32,7 +32,7 @@ async function extract(in_file: string, stillOutDir: string | undefined, animate
     for (const entry of tex.entries) {
       const idNo = entry.name.match(/[A-Z]+_0*(\d+)\.PNG/)![1];
       const fname = forTsubaki && !isCard ? `${await formatTsubakiFile(idNo, server)}.png` : entry.name;
-      if (newOnly && fs.existsSync(join(outDir, fname))) {continue;}
+      if (newOnly && !isCard && fs.existsSync(join(outDir, fname))) {continue;}
       const image = await TEX.decode(entry);
       if (!forTsubaki || isCard) {
         writeFile(outDir, fname, image);
