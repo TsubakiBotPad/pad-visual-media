@@ -1,7 +1,7 @@
 import { downloadBaseJson } from '../downloader/base';
 import { downloadBc } from '../downloader/bc';
-import { downloadExtlist } from '../downloader/extlist';
-import { Extlist } from '../models/extlist';
+import { downloadExtlist2 } from '../downloader/extlist2';
+import { Extlist2 } from '../models/extlist2';
 import minimist from "minimist";
 const cliProgress = require('cli-progress');
 const Semaphore = require('ts-semaphore');
@@ -9,7 +9,7 @@ import { formatTsubakiFile } from '../utils';
 
 async function update(outDir: string, server: string, newOnly: boolean, useAndroid: boolean, noLeaks: boolean, monsIds: number[], cardIds: number[], quiet: boolean) {
   const baseJson = await downloadBaseJson(server.toUpperCase(), useAndroid);
-  const extlist = Extlist.load(await downloadExtlist(baseJson.extlist));
+  const extlist = Extlist2.load(await downloadExtlist2(baseJson.extlist));
 
   let pbar = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
   if (!quiet) {pbar.start(extlist.entries.length, 0);}
