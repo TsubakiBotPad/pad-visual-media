@@ -34,7 +34,7 @@ export const Extlist2 = {
     const compressedInfoOffset = 0x10 + numEntries * 24;
     for (let i = 0; i < numEntries; i++) {
       const flags = buf.readUInt16LE(0x10 + i * 24 + 0);
-      const isCards = (flags > 50000) !== 0;
+      const isCards = flags > 50000;
       const id = flags % 50000;
       if (id === 0) continue;
 
