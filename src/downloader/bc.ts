@@ -3,10 +3,10 @@ import { existsSync, writeFileSync } from 'fs';
 import { padStart } from 'lodash';
 import { join } from 'path';
 import { BC } from '../models/bc';
-import { ExtlistEntry } from '../models/extlist';
+import { Extlist2Entry } from '../models/extlist2';
 import { TEX } from '../models/tex';
 
-export async function downloadBc(binPath: string, extlist: string, entry: ExtlistEntry, 
+export async function downloadBc(binPath: string, extlist: string, entry: Extlist2Entry, 
                                  newOnly: boolean): Promise<boolean> {
   const key = `${entry.isCards ? 'cards' : 'mons'}_${padStart(entry.id.toString(), 3, '0')}`;
 
